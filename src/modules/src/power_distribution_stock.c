@@ -32,6 +32,9 @@
 #include "motors.h"
 
 static bool motorSetEnable = false;
+static bool motorSetEnable_t = false;
+static uint16_t countmaster = 5000;
+static uint16_t countdowner = 5000;
 
 static struct {
   uint32_t m1;
@@ -91,12 +94,24 @@ void powerDistribution(const control_t *control)
                                control->yaw);
   #endif
 
+  if(motorSetEnable_t == true && countdowner > 0)
+  {
+   motorSetEnable = true;
+   countdowner = countdowner - 1;
+  }
+  else if(motorSetEnable_t == true && countdowner == 0)
+  {
+    motorSetEnable = false;
+    motorSetEnable_t = false;
+    countdowner = countmaster;
+  }
+
   if (motorSetEnable)
   {
-    motorsSetRatio(MOTOR_M1, motorPowerSet.m1);
-    motorsSetRatio(MOTOR_M2, motorPowerSet.m2);
-    motorsSetRatio(MOTOR_M3, motorPowerSet.m3);
-    motorsSetRatio(MOTOR_M4, motorPowerSet.m4);
+    motorsSetRatio(MOTOR_M1, motorPowerSet.m2);
+    motorsSetRatio(MOTOR_M2, motorPowerSet.m1);
+    motorsSetRatio(MOTOR_M3, motorPowerSet.m1);
+    motorsSetRatio(MOTOR_M4, motorPowerSet.m2);
   }
   else
   {
@@ -109,6 +124,8 @@ void powerDistribution(const control_t *control)
 
 PARAM_GROUP_START(motorPowerSet)
 PARAM_ADD(PARAM_UINT8, enable, &motorSetEnable)
+PARAM_ADD(PARAM_UINT8, enable_t, &motorSetEnable_t)
+PARAM_ADD(PARAM_UINT16, countmaster, &countmaster)
 PARAM_ADD(PARAM_UINT16, m1, &motorPowerSet.m1)
 PARAM_ADD(PARAM_UINT16, m2, &motorPowerSet.m2)
 PARAM_ADD(PARAM_UINT16, m3, &motorPowerSet.m3)
