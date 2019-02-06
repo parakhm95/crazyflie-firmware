@@ -30,6 +30,10 @@
  * lighthouse.c: lighthouse tracking system receiver
  */
 
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+
 #include "system.h"
 #include "deck.h"
 #include "log.h"
@@ -46,6 +50,7 @@
 
 #include "estimator_kalman.h"
 
+static bool isInit = false;
 
 static pulseProcessorResult_t angles[PULSE_PROCESSOR_N_SENSORS];
 
@@ -105,10 +110,10 @@ static void calculateStats(uint32_t nowMs) {
 
 
 baseStationGeometry_t baseStationsGeometry[] = {
-  {.origin = {-2.029516, 2.391417, -1.356382, }, .mat = {{-0.718327, 0.285313, -0.634511, }, {0.066982, 0.936164, 0.345125, }, {0.692474, 0.205412, -0.691582, }, }},
-  {.origin = {1.027486, 2.587440, 1.884445, }, .mat = {{0.846093, -0.256320, 0.467361, }, {-0.021730, 0.859477, 0.510712, }, {-0.532592, -0.442266, 0.721628, }, }},
+  {.origin = {-1.642549, 2.367428, -1.647901, }, .mat = {{-0.778188, 0.261763, -0.570880, }, {0.068261, 0.938867, 0.337445, }, {0.624311, 0.223627, -0.748483, }, }},
+  {.origin = {1.156152, 2.559995, 1.866168, }, .mat = {{0.871025, -0.170744, 0.460609, }, {-0.088093, 0.868159, 0.488406, }, {-0.483274, -0.465991, 0.741147, }, }},
 };
-
+  
 static vec3d position;
 static positionMeasurement_t ext_pos;
 static void estimatePosition(pulseProcessorResult_t angles[]) {
@@ -134,6 +139,10 @@ static void estimatePosition(pulseProcessorResult_t angles[]) {
   ext_pos.y /= sensorsUsed;
   ext_pos.z /= sensorsUsed;
 
+  // Make sure we feed sane data into the estimator
+  if (!isfinite(ext_pos.pos[0]) || !isfinite(ext_pos.pos[1]) || !isfinite(ext_pos.pos[2])) {
+    return;
+  }
   ext_pos.stdDev = 0.01;
   estimatorKalmanEnqueuePosition(&ext_pos);
 }
@@ -164,6 +173,8 @@ static void lighthouseTask(void *param)
       }
       synchronized = syncCounter == 7;
     }
+
+    DEBUG_PRINT("LH: Synchronized!\n");
 
     // Receive data until being desynchronized
     synchronized = getFrame(&frame);
@@ -207,15 +218,21 @@ static void lighthouseTask(void *param)
 
 static void lighthouseInit(DeckInfo *info)
 {
-  uart1Init(230400);
+  if (isInit) return;
 
+  uart1Init(230400);
+  
   xTaskCreate(lighthouseTask, "LH",
               configMINIMAL_STACK_SIZE, NULL, /*priority*/1, NULL);
+  
+  isInit = true;
 }
 
 
 static const DeckDriver lighthouse_deck = {
-  .name = "bcLH8",
+  .vid = 0xBC,
+  .pid = 0x10,
+  .name = "bcLighthouse4",
 
   .usedGpio = 0,  // FIXME: set the used pins
   .requiredEstimator = kalmanEstimator,
